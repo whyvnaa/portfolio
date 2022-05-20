@@ -15,8 +15,28 @@ body {
 }
 
 div#header {
+    position: relative;
+    height: 80px;
 }
 
 svg#header {
     display: block;
+    float: left;
+}
+
+button#reload {
+    margin: 0;
+    margin-right: 20px;
+    position: relative;
+    top: 50%;
+    -ms-transform: translateY(-50%);
+    transform: translateY(-50%);
+    float: right;
+    height: 56px;
+    font-family: "Andale Mono", AndaleMono, monospace;
+    color: #eeeeee;
+    background-color: #00adb5;
+    border: 0px;
+    width: 110px;
+    font-size: 20px;
 }

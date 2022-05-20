@@ -1,6 +1,9 @@
 const header_height = 80;
-const width = window.innerWidth;
-const height = 950;
+const header_svg_width = 350;
+
+var width = window.innerWidth;
+var height = window.innerHeight - header_height - 5; // -1 because of the <hr> line
+
 const header_margin = {
     left: 10,
     right: 0,
@@ -17,7 +20,7 @@ const margin = {
 // HEADER -------------------------------------------
 const header = d3.select('svg#header')
     .attrs({
-        width: '100%',
+        width: header_svg_width,
         height: header_height,
     })
 
@@ -65,60 +68,63 @@ const svg = d3.select('svg#main')
 
 const colorScale = d3.scaleSequential(d3.interpolateInferno)
 
-const pages = [
-    {
-        name: 'about',
-        r: 130,
-    },
-    {
-        name: 'contact',
-        r: 100,
-    },
-    {
-        name: 'projects',
-        r: 160,
-    },
-]
-
-const data = pages.map(d => {
-    return {
-        name: d.name,
-        r: d.r,
-        colorHue: Math.random(),
-        opacity: 1,
-        main: true
-    }
-})
-
 function updateSim() {
-    const curWidth = window.innerWidth
-    const curHeight = window.innerHeight - header_height - 5; // -1 because of the <hr> line
+    const pages = [
+        {
+            name: 'about',
+            r: 130,
+        },
+        {
+            name: 'contact',
+            r: 100,
+        },
+        {
+            name: 'projects',
+            r: 160,
+        },
+    ]
+
+    var data = pages.map(d => {
+        return {
+            name: d.name,
+            r: d.r,
+            x: (Math.random() * width - width / 2),
+            y: (Math.random() * height - height / 2),
+            colorHue: Math.random(),
+            opacity: 1,
+            main: true
+        }
+    })
 
     data.push(...
         Array.from({ length: 200 }, () => {
             return {
                 name: '',
                 r: (Math.random() * 80 + 5),
-                x: (Math.random() * curWidth - curWidth / 2) * 2,
-                y: (Math.random() * curHeight - curHeight / 2) * 2,
+                x: (Math.random() * width - width / 2) * 2,
+                y: (Math.random() * height - height / 2) * 2,
                 colorHue: Math.random(),
                 opacity: 0.5,
             }
         })
     )
 
+    data = data.reverse()
+
+    svg.selectAll('*').remove()
+
     svg
         .attrs({
-            width: curWidth,
-            height: curHeight,
-            viewBox: [-curWidth / 2, -curHeight / 2, curWidth, curHeight],
+            width: width,
+            height: height,
+            viewBox: [-width / 2, -height / 2, width, height],
         })
 
     const nodes = svg.selectAll('.node')
         .data(data).enter()
         .append('g')
         .attr('class', 'node')
-        .style('cursor', 'grab');
+        .style('cursor', 'grab')
     nodes
         .append('circle')
         .attrs({
@@ -140,6 +146,24 @@ function updateSim() {
             'fill': d => d.colorHue < 0.2 ? 'white' : 'black'
         })
 
+    var clickedIndex = -1;
+    var oldRadius = 0;
+    nodes.on('click', function (e) {
+        if (clickedIndex >= 0) {
+            data[clickedIndex].r = oldRadius;
+            sim.force('collision').initialize(data);
+            d3.select(this).select('circle').attr('r', oldRadius);
+            clickedIndex = -1;
+            // updateSim();
+        } else {
+            clickedIndex = d3.select(this).select('circle').data()[0].index;
+            oldRadius = data[d3.select(this).select('circle').data()[0].index].r
+            data[clickedIndex].r = 400;
+            sim.force('collision').initialize(data);
+            d3.select(this).select('circle').attr('r', 400);
+        }
+    });
+
     function getSize(d) {
         var bbox = this.getBBox(),
             cbbox = this.parentNode.getBBox(),
@@ -153,21 +177,21 @@ function updateSim() {
         )
         .force('center', d3.forceCenter())
         .force('collision', d3.forceCollide()
-            .radius(d => d.r * 1.2)
-            .iterations(3)
+            .radius(d => d.r * 1.1)
+            .iterations(2)
         )
         .force('x', d3.forceX(0)
-            .strength(d => d.main ? 0.1 : 0.01)
+            .strength(d => d.main ? 0.05 : 0.01)
         )
         .force('y', d3.forceY(0)
-            .strength(d => d.main ? 0.2 : 0.02)
+            .strength(d => d.main ? 0.05 : 0.02)
         )
         .alphaDecay(0.01)
         .on("tick", ticked);
 
     function ticked() {
         nodes
-            .attr('transform', d => `translate(${d.x} ${d.y})`);
+            .attr('transform', d => `translate(${d.x} ${d.y})`)
     }
 
     function drag(sim) {
@@ -199,3 +223,15 @@ function updateSim() {
 
 }
 updateSim();
+
+window.addEventListener('resize', () => {
+    width = window.innerWidth;
+    height = window.innerHeight - header_height - 5;
+
+    svg
+        .attrs({
+            width: width,
+            height: height,
+            viewBox: [-width / 2, -height / 2, width, height],
+        })
+});
