@@ -1,8 +1,10 @@
 const header_height = 80;
-const header_svg_width = 350;
+const header_svg_width = 500;
 
 var width = window.innerWidth;
 var height = window.innerHeight - header_height - 5; // -1 because of the <hr> line
+
+var currentPage = 0 // 0=root, 1=projects, 2=about, 3=contact
 
 const header_margin = {
     left: 10,
@@ -18,46 +20,7 @@ const margin = {
 };
 
 // HEADER -------------------------------------------
-const header = d3.select('svg#header')
-    .attrs({
-        width: header_svg_width,
-        height: header_height,
-    })
-
-const pre_text = header
-    .append('text')
-    .text('this is:')
-    .styles({
-        'font-size': 37,
-        'fill': '#EEEEEE',
-        'dominant-baseline': 'middle',
-        'font-family': '"Andale Mono", AndaleMono, monospace',
-        'user-select': 'none',
-    })
-    .attrs({
-        x: header_margin.left,
-        y: header_height / 2,
-    })
-
-const pre_text_bbox = pre_text.node().getBBox();
-
-const name_text = ['j', 'u', 'l', 'i', 'a', 'n'].forEach((char, i) =>
-    header
-        .append('text')
-        .text(char)
-        .styles({
-            'font-size': 37,
-            'fill': '#EEEEEE',
-            'dominant-baseline': 'middle',
-            'font-family': '"Andale Mono", AndaleMono, monospace',
-            'user-select': 'none',
-        })
-        .attrs({
-            x: header_margin.left + pre_text_bbox.width + 20 + i * 22.22,
-            y: header_height / 2,
-        })
-)
-
+const header = d3.select('#path') //TODO: make just a div, no need for svg
 
 // BODY -------------------------------------------
 const svg = d3.select('svg#main')
@@ -66,9 +29,11 @@ const svg = d3.select('svg#main')
         height: height,
     })
 
-const colorScale = d3.scaleSequential(d3.interpolateInferno)
+function load_root() {
+    header.html('/julian');
 
-function updateSim() {
+    const colorScale = d3.scaleSequential(d3.interpolateInferno)
+
     const pages = [
         {
             name: 'about',
@@ -84,7 +49,7 @@ function updateSim() {
         },
     ]
 
-    var data = pages.map(d => {
+    const mainNodes = pages.map(d => {
         return {
             name: d.name,
             r: d.r,
@@ -92,26 +57,25 @@ function updateSim() {
             y: (Math.random() * height - height / 2),
             colorHue: Math.random(),
             opacity: 1,
-            main: true
+            layer: 0,
         }
     })
 
-    data.push(...
-        Array.from({ length: 200 }, () => {
-            return {
-                name: '',
-                r: (Math.random() * 80 + 5),
-                x: (Math.random() * width - width / 2) * 2,
-                y: (Math.random() * height - height / 2) * 2,
-                colorHue: Math.random(),
-                opacity: 0.5,
-            }
-        })
-    )
+    const data = Array.from({ length: 50 }, () => { // randomNodes
+        return {
+            name: '',
+            r: (Math.random()**1.7 * 60 + 10),
+            x: (Math.random() * width - width / 2) * 2,
+            y: (Math.random() * height - height / 2) * 2,
+            colorHue: Math.random(),
+            opacity: 0.6,
+            layer: 1,
+        }
+    })
+    
+    data.push(...mainNodes)
 
-    data = data.reverse()
-
-    svg.selectAll('*').remove()
+    svg.selectAll('.node').remove()
 
     svg
         .attrs({
@@ -130,9 +94,12 @@ function updateSim() {
         .attrs({
             r: d => d.r,
             fill: d => colorScale(d.colorHue),
-            opacity: d => d.opacity
+        })
+        .styles({
+            filter: d => `brightness(${d.opacity})`,
         })
     nodes
+        .filter(d => d.layer === 0)
         .append('text')
         .text(d => d.name)
         .style("font-size", "1px")
@@ -143,24 +110,19 @@ function updateSim() {
             'dominant-baseline': 'middle',
             'text-anchor': 'middle',
             'font-weight': 'bold',
-            'fill': d => d.colorHue < 0.2 ? 'white' : 'black'
+            'fill': d => d.colorHue < 0.8 ? 'white' : 'black'
         })
 
-    var clickedIndex = -1;
-    var oldRadius = 0;
-    nodes.on('click', function (e) {
-        if (clickedIndex >= 0) {
-            data[clickedIndex].r = oldRadius;
-            sim.force('collision').initialize(data);
-            d3.select(this).select('circle').attr('r', oldRadius);
-            clickedIndex = -1;
-            // updateSim();
-        } else {
-            clickedIndex = d3.select(this).select('circle').data()[0].index;
-            oldRadius = data[d3.select(this).select('circle').data()[0].index].r
-            data[clickedIndex].r = 400;
-            sim.force('collision').initialize(data);
-            d3.select(this).select('circle').attr('r', 400);
+    nodes.filter(d => d.layer===0).on('click', function (e,d) {
+        const name = d.name;
+        switch (name) {
+            case 'projects':
+                currentPage = 1;
+                load_projects();
+                break;
+        
+            default:
+                break;
         }
     });
 
@@ -173,7 +135,7 @@ function updateSim() {
 
     const sim = d3.forceSimulation(data)
         .force('charge', d3.forceManyBody()
-            .strength(5)
+            .strength(-10)
         )
         .force('center', d3.forceCenter())
         .force('collision', d3.forceCollide()
@@ -181,10 +143,10 @@ function updateSim() {
             .iterations(2)
         )
         .force('x', d3.forceX(0)
-            .strength(d => d.main ? 0.05 : 0.01)
+            .strength(d => d.layer == 0 ? 0.1 : 0.03)
         )
         .force('y', d3.forceY(0)
-            .strength(d => d.main ? 0.05 : 0.02)
+            .strength(d => d.layer == 0 ? 0.1 : 0.03)
         )
         .alphaDecay(0.01)
         .on("tick", ticked);
@@ -194,37 +156,167 @@ function updateSim() {
             .attr('transform', d => `translate(${d.x} ${d.y})`)
     }
 
-    function drag(sim) {
-        function dragstarted(e) {
-            if (!e.active) sim.alphaTarget(0.3).restart();
-            e.subject.fx = e.subject.x;
-            e.subject.fy = e.subject.y;
-            nodes.style('cursor', 'grabbing')
-        }
+    nodes.call(drag(sim,nodes));
+}
 
-        function dragged(e) {
-            e.subject.fx = e.x;
-            e.subject.fy = e.y;
-        }
+function load_projects() {
+    header.html('/julian/projects')
 
-        function dragended(e) {
-            if (!e.active) sim.alphaTarget(0);
-            e.subject.fx = null;
-            e.subject.fy = null;
-            nodes.style('cursor', 'grab')
-        }
+    const colorScale = d3.scaleSequential(d3.interpolateInferno)
 
-        return d3.drag()
-            .on("start", dragstarted)
-            .on("drag", dragged)
-            .on("end", dragended);
+    const backNode = {
+        name: 'go back',
+        r: 50,
+        layer: -1,
+        x: -width / 2 + 70,
+        y: -height / 2 + 70,
+        colorHue: 0,
+        opacity: 1,
     }
-    nodes.call(drag(sim));
+
+    const mainNodes = [
+        {
+            name: 'project1',
+            r:100,
+        },
+        {
+            name: 'project2',
+            r:200,
+        },
+        {
+            name: 'project3',
+            r:150,
+        },
+        {
+            name: 'project4',
+            r:125,
+        },
+        {
+            name: 'project5',
+            r:175,
+        },
+    ]
+
+    const data = mainNodes.map(d => {
+        return {
+            name: d.name,
+            r: d.r,
+            x: (Math.random() * width - width / 2),
+            y: (Math.random() * height - height / 2),
+            colorHue: Math.random(),
+            opacity: 1,
+            layer: 0,
+        }
+    })
+
+    data.push(backNode)
+
+    svg.selectAll('.node').remove()
+
+    const nodes = svg.selectAll('.node')
+        .data(data).enter()
+        .append('g')
+        .attr('class', 'node')
+        .style('cursor', 'grab')
+    nodes
+        .append('circle')
+        .attrs({
+            r: d => d.r,
+            fill: d => colorScale(d.colorHue),
+        })
+        .styles({
+            filter: d => `brightness(${d.opacity})`,
+        })
+    nodes
+        .filter(d => d.layer <= 0)
+        .append('text')
+        .text(d => d.name)
+        .style("font-size", "1px")
+        .each(getSize)
+        .styles({
+            'font-family': '"Andale Mono", AndaleMono, monospace',
+            'font-size': d => d.scale / 1.6 + "px",
+            'dominant-baseline': 'middle',
+            'text-anchor': 'middle',
+            'font-weight': 'bold',
+            'fill': d => d.colorHue < 0.8 ? 'white' : 'black'
+        })
+
+    nodes.filter(d => d.layer <= 0).on('click', function (e,d) {
+        const name = d.name;
+        switch (name) {
+            case 'go back':
+                currentPage = 0;
+                load_root();
+                break;
+        
+            default:
+                break;
+        }
+    });
+
+    function getSize(d) {
+        var bbox = this.getBBox(),
+            cbbox = this.parentNode.getBBox(),
+            scale = Math.min(cbbox.width / bbox.width, cbbox.height / bbox.height);
+        d.scale = scale;
+    }
+
+    const sim = d3.forceSimulation(data)
+        .force('charge', d3.forceManyBody()
+            .strength(-10)
+        )
+        .force('center', d3.forceCenter())
+        .force('collision', d3.forceCollide()
+            .radius(d => d.r * 1.1)
+            .iterations(2)
+        )
+        .force('x', d3.forceX(d => d.layer === -1 ? d.x : 0)
+            .strength(d => d.layer === 0 ? 0.1 : (d.layer===-1 ? 0.5 : 0.03))
+        )
+        .force('y', d3.forceY(d => d.layer === -1 ? d.y : 0)
+            .strength(d => d.layer === 0 ? 0.1 : (d.layer===-1 ? 0.5 : 0.03))
+        )
+        .alphaDecay(0.01)
+        .on("tick", ticked);
+
+    function ticked() {
+        nodes
+            .attr('transform', d => `translate(${d.x} ${d.y})`)
+    }
+
+    nodes.call(drag(sim,nodes));
 
 }
-updateSim();
+
+function drag(sim,nodes) {
+    function dragstarted(e) {
+        if (!e.active) sim.alphaTarget(0.3).restart();
+        e.subject.fx = e.subject.x;
+        e.subject.fy = e.subject.y;
+        nodes.style('cursor', 'grabbing')
+    }
+
+    function dragged(e) {
+        e.subject.fx = e.x;
+        e.subject.fy = e.y;
+    }
+
+    function dragended(e) {
+        if (!e.active) sim.alphaTarget(0);
+        e.subject.fx = null;
+        e.subject.fy = null;
+        nodes.style('cursor', 'grab')
+    }
+
+    return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
+}
 
 window.addEventListener('resize', () => {
+
     width = window.innerWidth;
     height = window.innerHeight - header_height - 5;
 
@@ -235,3 +327,25 @@ window.addEventListener('resize', () => {
             viewBox: [-width / 2, -height / 2, width, height],
         })
 });
+
+function reload(){
+    switch (currentPage) {
+        case 0:
+            load_root();
+            break;
+        case 1:
+            load_projects();
+            break;
+        case 2:
+            load_root();
+            break;
+        case 3:
+            load_root();
+            break;
+    
+        default:
+            break;
+    }
+}
+
+load_root();

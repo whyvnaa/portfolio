@@ -19,9 +19,20 @@ div#header {
     height: 80px;
 }
 
-svg#header {
+#path {
     display: block;
     float: left;
+    font-size: 37px;
+    color: #EEEEEE;
+    font-family: "Andale Mono", AndaleMono, monospace;
+    user-select: none;
+
+    margin: 0;
+    margin-left: 20px;
+    position: relative;
+    top: 48%;
+    -ms-transform: translateY(-50%);
+    transform: translateY(-50%);
 }
 
 button#reload {
